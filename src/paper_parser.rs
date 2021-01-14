@@ -1,6 +1,6 @@
 use std::error::Error;
 use std::fs::File;
-use std::io::{BufRead, BufReader, BufWriter, Write};
+use std::io::{stdout, BufRead, BufReader, BufWriter, Write};
 use std::path::Path;
 
 use rdf::node::Node::{LiteralNode, UriNode};
@@ -74,6 +74,7 @@ pub fn parse(path: &Path, outfile: &Path) -> Result<(), Box<dyn Error>> {
     let mut lines: Vec<String> = vec![];
 
     let mut valid_papers = 0;
+    let mut line_no = 0;
 
     while let Some(line) = reader
         .read_line(&mut buf)
@@ -81,6 +82,8 @@ pub fn parse(path: &Path, outfile: &Path) -> Result<(), Box<dyn Error>> {
         .transpose()
     {
         let line = line?;
+
+        line_no += 1;
 
         let entity = if line.starts_with(ENTITY) {
             line.split_once(' ').map(|split| split.0).unwrap()
@@ -97,7 +100,8 @@ pub fn parse(path: &Path, outfile: &Path) -> Result<(), Box<dyn Error>> {
                         valid_papers += 1;
 
                         if valid_papers % 10_000 == 0 {
-                            println!("{}", valid_papers);
+                            print!("\r{} valid papers, line {}", valid_papers, line_no);
+                            stdout().flush()?;
                         }
 
                         for line in &lines {
