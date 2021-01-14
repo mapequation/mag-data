@@ -1,3 +1,5 @@
+#![feature(str_split_once)]
+
 use std::error::Error;
 
 mod fields;
