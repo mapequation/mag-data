@@ -118,10 +118,9 @@ pub fn read_papers(path: &Path) -> Result<HashMap<Entity, Paper>, Box<dyn Error>
 
                 match Paper::try_from(&lines) {
                     Ok(paper) => {
-                        //println!("{:?}", paper);
                         papers.insert(paper.entity.clone(), paper);
                     }
-                    Err(_err) => {}
+                    _ => {}
                 }
 
                 lines.clear();
