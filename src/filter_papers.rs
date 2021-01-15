@@ -2,14 +2,15 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::error::Error;
 use std::fs::File;
-use std::io::{BufRead, BufReader};
+use std::io::{stdout, BufRead, BufReader, BufWriter, Write};
 use std::path::Path;
 
 use rdf::node::Node::{LiteralNode, UriNode};
 use rdf::reader::n_triples_parser::NTriplesParser;
 use rdf::reader::rdf_parser::RdfParser;
 
-type Entity = String;
+use crate::journals_wikidata_fields::Journal;
+use crate::types::*;
 
 #[derive(Default, Debug)]
 pub struct Paper {
@@ -79,9 +80,17 @@ impl TryFrom<&Vec<String>> for Paper {
     }
 }
 
-pub fn read_papers(path: &Path) -> Result<HashMap<Entity, Paper>, Box<dyn Error>> {
+pub fn filter(
+    path: &Path,
+    outfile: &Path,
+    journals: HashMap<Entity, Journal>,
+) -> Result<(), Box<dyn Error>> {
     let mut reader = BufReader::new(File::open(path)?);
     let mut buf = String::new();
+
+    let mut writer = BufWriter::new(File::create(outfile)?);
+
+    writeln!(writer, "entity\trank\ttitle\tdate\tcitations\tjournal_issn\tjournal_rank\tjournal_name\tjournal_subject\tjournal_field\tsubject_field_distance")?;
 
     const ENTITY: &str = "<http://ma-graph.org/entity/";
 
@@ -89,21 +98,14 @@ pub fn read_papers(path: &Path) -> Result<HashMap<Entity, Paper>, Box<dyn Error>
 
     let mut lines: Vec<String> = vec![];
 
-    let mut papers = HashMap::new();
-
-    let mut row = 0;
+    let mut num_papers: usize = 0;
+    let mut num_papers_found: usize = 0;
 
     while let Some(line) = reader
         .read_line(&mut buf)
         .map(|u| if u == 0 { None } else { Some(&buf) })
         .transpose()
     {
-        row += 1;
-
-        if row % 100_000 == 0 {
-            println!("{}", row);
-        }
-
         let line = line?;
 
         let entity = if line.starts_with(ENTITY) {
@@ -118,7 +120,32 @@ pub fn read_papers(path: &Path) -> Result<HashMap<Entity, Paper>, Box<dyn Error>
 
                 match Paper::try_from(&lines) {
                     Ok(paper) => {
-                        papers.insert(paper.entity.clone(), paper);
+                        num_papers += 1;
+
+                        if let Some(journal) = journals.get(&paper.journal) {
+                            num_papers_found += 1;
+
+                            writeln!(
+                                writer,
+                                "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{:.3e}",
+                                paper.entity,
+                                paper.rank,
+                                paper.title,
+                                paper.date,
+                                paper.citations,
+                                journal.issn,
+                                journal.rank,
+                                journal.name,
+                                journal.subject,
+                                journal.field,
+                                journal.distance
+                            )?;
+                        }
+
+                        if num_papers % 10_000 == 0 {
+                            print!("\r {} / {}", num_papers_found, num_papers);
+                            stdout().flush()?;
+                        }
                     }
                     _ => {}
                 }
@@ -133,16 +160,23 @@ pub fn read_papers(path: &Path) -> Result<HashMap<Entity, Paper>, Box<dyn Error>
         buf.clear();
     }
 
-    Ok(papers)
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::journals_wikidata_fields::read_wikidata;
+
     use super::*;
 
     #[test]
     fn test_read_papers() {
-        let papers = read_papers(Path::new("Papers_100.nt")).unwrap();
-        println!("{}", papers.len());
+        let journals = read_wikidata(Path::new("journals_mag_wikidata_fields.csv")).unwrap();
+        filter(
+            Path::new("Papers_valid_1000.nt"),
+            Path::new("Papers_journal_field.tsv"),
+            journals,
+        )
+        .unwrap();
     }
 }

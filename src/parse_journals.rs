@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Default, Debug, Serialize, Deserialize)]
 pub struct Journal {
-    pub uri: String,
+    pub entity: String,
     pub rank: u32,
     pub name: String,
     pub issn: String,
@@ -37,7 +37,7 @@ pub fn read_journals(path: &Path) -> Result<Vec<Journal>, Box<dyn Error>> {
                         }
 
                         journal = Some(Journal {
-                            uri: iri.clone(),
+                            entity: iri.clone(),
                             ..Journal::default()
                         });
 

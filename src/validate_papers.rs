@@ -73,8 +73,8 @@ pub fn parse(path: &Path, outfile: &Path) -> Result<(), Box<dyn Error>> {
 
     let mut lines: Vec<String> = vec![];
 
-    let mut valid_papers = 0;
-    let mut line_no = 0;
+    let mut valid_papers: usize = 0;
+    let mut line_no: usize = 0;
 
     while let Some(line) = reader
         .read_line(&mut buf)
